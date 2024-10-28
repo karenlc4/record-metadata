@@ -1,6 +1,5 @@
 #%% Imports, data, and functions
 import polars as pl
-import lets_plot
 from lets_plot import *
 LetsPlot.setup_html()
 
@@ -35,34 +34,29 @@ def remove_numbers(df: pl.DataFrame, column_names:list) -> pl.DataFrame:
 
 #%% Working through 260
 
-## 260$a
-place = remove_non_special_chars(data, ["260$a-Place of publication, distribution, etc."])\
-    .select(["index", "260$a-Place of publication, distribution, etc."])
-
-place_agg = (
-    place
-    .group_by("260$a-Place of publication, distribution, etc.")
-    .agg(pl.len().alias("Count"))  # Apply alias to the aggregation
+df2 = (
+    data
+    # First, remove non-special characters in specified columns
+    .pipe(remove_non_special_chars, [
+        "260$a-Place of publication, distribution, etc.", 
+        "260$b-Name of publisher, distributor, etc.", 
+        "264$a-Place of production, publication, distribution, manufacture", 
+        "264$b-Name of producer, publisher, distributor, manufacturer"
+    ])
+    # Then, remove numbers in specified date columns
+    .pipe(remove_numbers, ["260$c-Date of publication", "264$c-Date of production, publication, or distribution"])
+    # Finally, select only the required columns
+    .select([
+        "index", 
+        "260$a-Place of publication, distribution, etc.", 
+        "260$b-Name of publisher, distributor, etc.", 
+        "260$c-Date of publication", 
+        "264$a-Place of production, publication, distribution, manufacture", 
+        "264$b-Name of producer, publisher, distributor, manufacturer", 
+        "264$c-Date of production, publication, or distribution"
+    ])
 )
 
-## 260$b
-name = remove_non_special_chars(data, ["260$b-Name of publisher, distributor, etc."])
-
-name_agg = (
-    name
-    .group_by("260$b-Name of publisher, distributor, etc.")
-    .agg(pl.len().alias("Count"))
-    .sort("Count", descending=True)
-)
-
-## 260$c
-date_pub = remove_numbers(data, ["260$c-Date of publication"])
-
-date_pub_agg = (
-    date_pub
-    .group_by("260$c-Date of publication")
-    .agg(pl.len().alias("Count"))  # Apply alias to the aggregation
-)
 # %% Working through 264
 
 ## 264$a-c
@@ -82,12 +76,9 @@ date_pub_new = remove_numbers(data, ["264$c-Date of production, publication, or 
     .agg(pl.col("264$c-Date of production, publication, or distribution").count().alias("Count"))
 
 #%% Comparing 260 and 264
-formats = remove_non_special_chars(data, ["260$a-Place of publication, distribution, etc.", "260$b-Name of publisher, distributor, etc.",  "260$c-Date of publication", "264$a-Place of production, publication, distribution, manufacture", "264$b-Name of producer, publisher, distributor, manufacturer", "264$c-Date of production, publication, or distribution"])
-
-formats = formats.select("260$a-Place of publication, distribution, etc.", "260$b-Name of publisher, distributor, etc.",  "260$c-Date of publication", "264$a-Place of production, publication, distribution, manufacture", "264$b-Name of producer, publisher, distributor, manufacturer", "264$c-Date of production, publication, or distribution").clone()
 
 test = (
-    formats
+    df2
     .group_by(
         ['260$a-Place of publication, distribution, etc.', 
          '264$a-Place of production, publication, distribution, manufacture']
