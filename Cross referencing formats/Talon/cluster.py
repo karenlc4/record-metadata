@@ -32,6 +32,44 @@ def remove_numbers(df: pl.DataFrame, column_names:list) -> pl.DataFrame:
     
     return df
 
+def plot_heatmap(df: pl.DataFrame, x_col: str, y_col: str, count_col: str = 'count'):
+    # Group by specified columns and count occurrences
+    grouped_df = (
+        df
+        .group_by([x_col, y_col])
+        .agg(pl.len().alias(count_col))  # Use pl.count() for clarity
+        .pivot(
+            on=y_col,
+            index=x_col,
+            values=count_col
+        )
+    )
+
+    # Convert to long format for plotting
+    long_df = grouped_df.unpivot(
+        index=[x_col],
+        on=[col for col in grouped_df.columns if col != x_col], # Specify columns clearly
+        variable_name=y_col,
+        value_name=count_col
+    )
+
+    # Convert to Pandas for plotnine if necessary
+    long_df_pd = long_df.to_pandas()
+
+    # Create the heatmap
+    heatmap = (
+        ggplot(long_df_pd, aes(x=x_col, y=y_col)) +
+        geom_tile(aes(fill=count_col)) +
+        labs(
+            title=f"Heatmap of {x_col} by {y_col}",
+            x=x_col,
+            y=y_col
+        ) +
+        theme_minimal() +
+        ggsize(800, 800)
+    )
+
+    return long_df, heatmap
 #%% Working through 260
 
 df2 = (
@@ -48,6 +86,7 @@ df2 = (
     # Finally, select only the required columns
     .select([
         "index", 
+        "040$b-Language of cataloging",
         "260$a-Place of publication, distribution, etc.", 
         "260$b-Name of publisher, distributor, etc.", 
         "260$c-Date of publication", 
@@ -109,5 +148,40 @@ ggplot(test_long, aes(y="260$a-Place of publication, distribution, etc.", x="264
          y = "260$a Format") +\
     theme_minimal()
 
-# %% Comparing Record Language with 264 columns
+# %% Comparing Catalog Language with 264 columns
 
+test2 = (
+    df2
+    .group_by(
+        ['264$a-Place of production, publication, distribution, manufacture', 
+         '040$b-Language of cataloging']
+    )
+    .agg(pl.len().alias("count"))  # Ensure to name the count column
+    .pivot(
+        on='040$b-Language of cataloging', 
+        index='264$a-Place of production, publication, distribution, manufacture', 
+        values='count'
+    )
+)
+
+# Convert to long format for plotting
+test_long2 = test2.unpivot(
+    index=['264$a-Place of production, publication, distribution, manufacture'],  # Keep this as identifier
+    on=test2.columns[1:],  # Use all other columns as value variables
+    variable_name='040$b-Language of cataloging',  # Name for the variable column
+    value_name='count'  # Name for the value column
+)
+
+ggplot(test_long2, aes(y="040$b-Language of cataloging", x="264$a-Place of production, publication, distribution, manufacture")) +\
+    geom_tile(aes(fill="count")) +\
+    labs(title="Most Common 264$a Formats for Each 260$a Format",
+         x = "264$a Format",
+         y = "Language Catalog") +\
+    theme_minimal() +\
+    ggsize(1000, 600)
+# %%
+long_df, heatmap = plot_heatmap(df2, x_col="264$a-Place of production, publication, distribution, manufacture", y_col="040$b-Language of cataloging")
+
+heatmap
+
+# %%

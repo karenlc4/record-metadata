@@ -1,8 +1,9 @@
 import streamlit as st
 import polars as pl
-import pandas as pd
 from lets_plot import *
 LetsPlot.setup_html()
+from marc_bibliography_mapping import marc_field_mapping_bibliographic_flat
+
 
 ## Functions
 
@@ -47,10 +48,6 @@ def process_and_combine_files(file_names: list) -> pl.DataFrame:
     # Cast '001' column to Int64 type
     combined = combined.with_columns(pl.col("001").cast(pl.Int64))
     
-    # Assuming append_245c is a separate file, read it and join with combined DataFrame
-    append_245c = pl.read_excel("245c-complete.xlsx")
-    combined = combined.join(append_245c, on="001")
-    
     # Rename columns using the mapping
     combined = combined.rename({tag: marc_field_mapping_bibliographic_flat.get(tag, tag) for tag in combined.columns})
     
@@ -62,9 +59,64 @@ def process_and_combine_files(file_names: list) -> pl.DataFrame:
     combined_new = drop_columns_that_are_all_null(combined)
 
     return combined_new
-    
-# Create upload file option
-uploaded_files = st.file_uploader("Choose a file", accept_multiple_files=True)
-if uploaded_files is not None:
-    df = process_and_combine_files(uploaded_files)
-    st.write(df)
+
+def plot_heatmap(df: pl.DataFrame, x_col: str, y_col: str, count_col: str = 'count'):
+    # Group by specified columns and count occurrences
+    grouped_df = (
+        df
+        .group_by([x_col, y_col])
+        .agg(pl.len().alias(count_col))  # Use pl.count() for clarity
+        .pivot(
+            on=y_col,
+            index=x_col,
+            values=count_col
+        )
+    )
+
+    # Convert to long format for plotting
+    long_df = grouped_df.unpivot(
+        index=[x_col],
+        on=[col for col in grouped_df.columns if col != x_col], # Specify columns clearly
+        variable_name=y_col,
+        value_name=count_col
+    )
+
+    # Convert to Pandas for plotnine if necessary
+    long_df_pd = long_df.to_pandas()
+
+    # Create the heatmap
+    heatmap = (
+        ggplot(long_df_pd, aes(x=x_col, y=y_col)) +
+        geom_tile(aes(fill=count_col)) +
+        labs(
+            title=f"Heatmap of {x_col} by {y_col}",
+            x=x_col,
+            y=y_col
+        ) +
+        theme_minimal() +
+        ggsize(800, 800)
+    )
+
+    return long_df, heatmap
+
+# Create file uploader
+uploaded_file = st.file_uploader("Choose files", accept_multiple_files=False)
+
+if uploaded_file is not None:
+    raw = pl.read_excel(uploaded_file)
+
+    df = raw.rename({tag: marc_field_mapping_bibliographic_flat.get(tag, tag) for tag in raw.columns})
+    df = drop_columns_that_are_all_null(df)
+
+    st.write(df.head())
+
+    with st.sidebar:
+        possible_x = df.columns
+        selected_x = st.selectbox("Select an x-axis:", possible_x)
+
+        possible_y = [col for col in df.columns if col != selected_x]
+        selected_y = st.selectbox("Select a y-axis:", possible_y)
+
+    #if selected_x and selected_y:
+    #    long_df, heatmap = plot_heatmap(df, selected_x, selected_y)
+    #    heatmap
