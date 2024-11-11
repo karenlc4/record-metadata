@@ -1,5 +1,7 @@
 #%% Imports, data, and functions
 import polars as pl
+import seaborn as sns
+import matplotlib.pyplot as plt
 from lets_plot import *
 LetsPlot.setup_html()
 
@@ -53,23 +55,18 @@ def plot_heatmap(df: pl.DataFrame, x_col: str, y_col: str, count_col: str = 'cou
         value_name=count_col
     )
 
-    # Convert to Pandas for plotnine if necessary
-    long_df_pd = long_df.to_pandas()
+    # Convert to Pandas for use with seaborn
+    heatmap_data = long_df.fill_null(0).to_pandas()
 
     # Create the heatmap
-    heatmap = (
-        ggplot(long_df_pd, aes(x=x_col, y=y_col)) +
-        geom_tile(aes(fill=count_col)) +
-        labs(
-            title=f"Heatmap of {x_col} by {y_col}",
-            x=x_col,
-            y=y_col
-        ) +
-        theme_minimal() +
-        ggsize(800, 800)
-    )
-
-    return long_df, heatmap
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(heatmap_data, annot=True, fmt="g", cmap='coolwarm')
+    plt.title(f'Heatmap of {x_col} vs {y_col}')
+    plt.xlabel(y_col)
+    plt.ylabel(x_col)
+    
+    # Return the matplotlib figure
+    return plt
 #%% Working through 260
 
 df2 = (
@@ -141,12 +138,7 @@ test_long = test.unpivot(
 
 # %% Heatmap for comparison (260$a)
 
-ggplot(test_long, aes(y="260$a-Place of publication, distribution, etc.", x="264$a-Place of production, publication, distribution, manufacture")) +\
-    geom_tile(aes(fill="count")) +\
-    labs(title="Most Common 264$a Formats for Each 260$a Format",
-         x = "264$a Format",
-         y = "260$a Format") +\
-    theme_minimal()
+
 
 # %% Comparing Catalog Language with 264 columns
 
