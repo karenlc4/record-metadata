@@ -2,7 +2,7 @@ import streamlit as st
 
 st.set_page_config(
     page_title="Family History Library - Metadata Cleanup",
-    page_icon="D:\\School\\Fall24\\Data Science Consulting\\Family Search Logo.png",
+    page_icon="assets/Family Search Logo.png",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -18,13 +18,13 @@ the metadata of these records has grown unwieldy. This application aims to provi
 # Sections for Points of Focus
 st.header("Currently Available Tools")
 
-st.markdown("### [1. Format Comparisons](pages\Heatmap.py)")
+st.markdown("### 1. Format Comparisons")
 st.write("""
 Metadata formats can vary widely between sources. Create visualizations to compare standards across various MARC columns. 
 Answer questions like: Do records published primarily in English follow a certain pattern of publication date formatting?
 """)
 
-st.subheader("2. Language Comparisons")
+st.markdown("### 2. Language Comparison")
 st.write("""
 Family history records span numerous languages, with each language presenting its own complexities in translation and interpretation.
 This tool provides language comparison utilities to detect and standardize terminology across multiple languages, reducing the barriers for multilingual record access.
