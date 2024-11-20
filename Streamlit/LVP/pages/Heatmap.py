@@ -1,12 +1,13 @@
+#%% Imports and functions
 import streamlit as st
 import polars as pl
-import seaborn as sns
-import matplotlib.pyplot as plt
+import altair as alt
+
 from marc_bibliography_mapping import marc_field_mapping_bibliographic_flat
 
 def remove_non_special_chars(series: pl.Series) -> pl.Series:
     # Define the regex pattern to keep only the specified special characters
-    pattern = r"[^@_!#$%^&*()<>?/\|}{~:]"
+    pattern = r"[^@_!#$%^&*()<>?/\|}{~:.]"
     
     # Apply the regex pattern to the series, replacing everything except special characters
     return series.str.replace_all(pattern, "")
@@ -22,7 +23,6 @@ def drop_columns_that_are_all_null(_df: pl.DataFrame) -> pl.DataFrame:
     return _df[[s.name for s in _df if not (s.null_count() == _df.height)]]
 
 def process_and_combine_files(file_names: list) -> pl.DataFrame:
-    from marc_bibliography_mapping import marc_field_mapping_bibliographic_flat
 
     # Read and cast all uploaded files to String type
     dataframes = [pl.read_csv(file_name).cast(pl.String) for file_name in file_names]
@@ -45,39 +45,18 @@ def process_and_combine_files(file_names: list) -> pl.DataFrame:
 
     return combined_new
 
-def plot_heatmap(df: pl.DataFrame, x_col: str, y_col: str, count_col: str = 'count'):
-    # Group by specified columns and count occurrences
-    grouped_df = (
-        df
-        .group_by([x_col, y_col])
-        .agg(pl.len().alias(count_col))  # Use pl.count() for clarity
-        .pivot(
-            on=y_col,
-            index=x_col,
-            values=count_col
-        )
-    )
+@st.cache_data
+def convert_df(_df):
+    # IMPORTANT: Cache the conversion to prevent computation on every rerun
+    return df.write_csv().encode("utf-8")
+#%% Streamlit start
 
-    # Convert to long format for plotting
-    long_df = grouped_df.unpivot(
-        index=[x_col],
-        on=[col for col in grouped_df.columns if col != x_col], # Specify columns clearly
-        variable_name=y_col,
-        value_name=count_col
-    )
-
-    # Convert to Pandas for use with seaborn
-    heatmap_data = long_df.fill_null(0).to_pandas()
-
-    # Create the heatmap
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(heatmap_data, annot=True, fmt="g", cmap='coolwarm')
-    plt.title(f'Heatmap of {x_col} vs {y_col}')
-    plt.xlabel(y_col)
-    plt.ylabel(x_col)
-    
-    # Return the matplotlib figure
-    return plt
+st.set_page_config(
+    page_title="Family History Library - Metadata Cleanup",
+    page_icon="D:\\School\\Fall24\\Data Science Consulting\\Family Search Logo.png",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # Create file uploader
 uploaded_file = st.file_uploader("Choose files", accept_multiple_files=False)
@@ -91,16 +70,7 @@ if uploaded_file is not None:
     with st.sidebar:
         # Select x-axis column and display rocker button for x-axis
         possible_x = df.columns
-        selected_x = st.selectbox("Select an x-axis:", possible_x)
-        x_option = st.radio(
-            "Choose an action for x-axis data:",
-            options=["Remove Non-special Characters", "Remove Digits"],
-            key="x_action"
-        )
-        if x_option == "Remove Non-special Characters":
-            df = df.with_columns(remove_non_special_chars(df[selected_x]).alias(selected_x))
-        else:
-            df = df.with_columns(remove_digits(df[selected_x]).alias(selected_x))
+        selected_x = st.selectbox("Select an x-axis (categorical):", possible_x)
         
         # Select y-axis column and display rocker button for y-axis
         possible_y = [col for col in df.columns if col != selected_x]
@@ -115,5 +85,41 @@ if uploaded_file is not None:
         else:
             df = df.with_columns(remove_digits(df[selected_y]).alias(selected_y))
 
-    heatmap = plot_heatmap(df, selected_x, selected_y)
-    st.pyplot(heatmap.figure)
+    test2 = (
+        df
+        .group_by(
+            [selected_x,
+             selected_y,]
+        )
+        .agg(pl.len().alias("count"))  # Ensure to name the count column
+        .pivot(
+            on=selected_y, 
+            index=selected_x,
+            values='count'
+        )
+    ).to_pandas()
+
+    test2_melted = test2.melt(id_vars=selected_x, var_name="Format", value_name="Count")
+
+    heatmap = alt.Chart(test2_melted).mark_rect().encode(
+        x=alt.X(f'{selected_x}:O', axis=alt.Axis(labelAngle=-60)),
+        y=alt.Y('Format:O', axis=alt.Axis(title=f'{selected_y.split('-')[0].strip()} Formats')),
+        color='Count:Q'
+        #tooltip=[selected_y, selected_x, 'Count']  # Tooltip with Student, Subject, and Score
+    ).properties(
+        title=f"{selected_x} VS {selected_y} Heatmap"
+    ).configure_view(
+        strokeWidth=0  # Removes border around the plot
+    )
+
+    # Displaying the Altair heatmap in Streamlit
+    st.altair_chart(heatmap, use_container_width=True)
+    
+    csv = convert_df(df)
+
+    st.download_button(
+    label="Download heatmap data as CSV",
+    data=csv,
+    file_name="large_df.csv",
+    mime="text/csv",
+)
