@@ -1,0 +1,9 @@
+streamlit
+polars
+altair
+pandas
+numpy
+tabulate
+matplotlib
+seaborn
+langid
