@@ -26,8 +26,8 @@ Answer questions like: Do records published primarily in English follow a certai
 
 st.markdown("### 2. Language Comparison")
 st.write("""
-Family history records span numerous languages, with each language presenting its own complexities in translation and interpretation.
-This tool provides language comparison utilities to detect and standardize terminology across multiple languages, reducing the barriers for multilingual record access.
+Many of the records in the library have mismatched language information. Perhaps the title of the record is in a language not recorded elsewhere in the metadata or vice versa.
+Identify records with languages anamolies.
 """)
 
 st.subheader("3. Record Types")
