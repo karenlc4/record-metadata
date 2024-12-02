@@ -7,3 +7,6 @@ tabulate
 matplotlib
 seaborn
 langid
+lets-plot
+fastexcel
+openpyxl
